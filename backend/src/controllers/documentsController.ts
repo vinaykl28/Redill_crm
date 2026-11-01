@@ -5,7 +5,7 @@ export async function getDocuments(req: Request, res: Response) {
   try {
     const { category, lead_id } = req.query;
 
-    const docs = await ServerStore.getDocuments(category as string, lead_id as string);
+    const docs = await ServerStore.getDocuments(category ? String(category) : undefined);
 
     res.json({
       success: true,
