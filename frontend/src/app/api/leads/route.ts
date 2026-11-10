@@ -7,10 +7,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || undefined;
     const assigned_to = searchParams.get('assigned_to') || undefined;
+    const assigned_sales_id = searchParams.get('assigned_sales_id') || undefined;
     const source = searchParams.get('source') || undefined;
     const search = searchParams.get('search') || undefined;
 
-    const leads = await ServerStore.getLeads({ status, assigned_to, source, search });
+    const leads = await ServerStore.getLeads({ status, assigned_to, assigned_sales_id, source, search });
 
     return NextResponse.json({
       success: true,
@@ -106,37 +107,13 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE /api/leads - Delete lead
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Lead ID is required in query params (?id=...)' },
-        { status: 400 }
-      );
-    }
-
-    const deleted = await ServerStore.deleteLead(id);
-    if (!deleted) {
-      return NextResponse.json(
-        { success: false, error: 'Lead not found or already deleted.' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Lead deleted successfully',
-      id,
-    });
-  } catch (error: unknown) {
-    const err = error as Error;
-    return NextResponse.json(
-      { success: false, error: err.message || 'Failed to delete lead' },
-      { status: 500 }
-    );
-  }
+// DELETE /api/leads - Lead deletion is disabled across Red Hill Infra CRM
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Lead deletion is disabled to preserve enterprise audit logs and data integrity.',
+    },
+    { status: 403 }
+  );
 }

@@ -68,6 +68,11 @@ export function LeadDetailModal({
       onEditLead(lead); // Open edit modal to specify reason
       return;
     }
+    if (newStatus === 'site_visit_scheduled') {
+      onClose();
+      onOpenScheduleVisit(lead);
+      return;
+    }
     await CrmService.updateLead(lead.id, { status: newStatus }, currentUser);
     onLeadUpdated();
   };
@@ -352,7 +357,10 @@ export function LeadDetailModal({
                       🚗 Vehicle: <strong className="text-slate-800">{v.vehicle_type}</strong> ({v.vehicle_number}) • Driver: {v.driver_name} ({v.driver_phone})
                     </p>
                     <p className="text-slate-700">
-                      📍 Pickup: {v.pickup_location} • Escort: <strong className="text-slate-900">{v.escort_name}</strong>
+                      📍 Pickup: {v.pickup_location} • Escort:{' '}
+                      <strong className="text-slate-900">
+                        {currentUser.role === 'telecaller' ? 'Assigned Sales Desk (Confidential)' : v.escort_name}
+                      </strong>
                     </p>
                     {v.feedback && (
                       <p className="text-emerald-900 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200 leading-relaxed">

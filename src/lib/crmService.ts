@@ -61,6 +61,34 @@ export class CrmService {
     return getFromStorage(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
   }
 
+  // --- ROUND-ROBIN SALES EXECUTIVE AUTO-ASSIGNMENT (ALPHABETICAL) ---
+  static getSortedSalesExecutives(): UserProfile[] {
+    const profiles = getFromStorage<UserProfile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
+    return profiles
+      .filter((p) => p.role === 'sales_executive')
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+
+  static getNextSalesExecutive(): UserProfile {
+    const salesExecs = this.getSortedSalesExecutives();
+    if (salesExecs.length === 0) {
+      return getFromStorage<UserProfile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES)[0];
+    }
+    const currentIdx = getFromStorage<number>('redhill_crm_sales_rr_index', 0);
+    const assigned = salesExecs[currentIdx % salesExecs.length];
+    saveToStorage('redhill_crm_sales_rr_index', (currentIdx + 1) % salesExecs.length);
+    return assigned;
+  }
+
+  static peekNextSalesExecutive(): UserProfile {
+    const salesExecs = this.getSortedSalesExecutives();
+    if (salesExecs.length === 0) {
+      return getFromStorage<UserProfile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES)[0];
+    }
+    const currentIdx = getFromStorage<number>('redhill_crm_sales_rr_index', 0);
+    return salesExecs[currentIdx % salesExecs.length];
+  }
+
   // --------------------------------------------------------------------------
   // LEADS
   // --------------------------------------------------------------------------
@@ -70,6 +98,8 @@ export class CrmService {
         let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
         if (currentUser.role === 'telecaller') {
           query = query.eq('assigned_to', currentUser.id);
+        } else if (currentUser.role === 'sales_executive') {
+          query = query.or(`assigned_sales_id.eq.${currentUser.id},assigned_to.eq.${currentUser.id}`);
         }
         const { data, error } = await query;
         if (!error && data) return data as Lead[];
@@ -81,7 +111,12 @@ export class CrmService {
     // Connect to Next.js REST API
     if (typeof window !== 'undefined') {
       try {
-        const queryParams = currentUser.role === 'telecaller' ? `?assigned_to=${currentUser.id}` : '';
+        let queryParams = '';
+        if (currentUser.role === 'telecaller') {
+          queryParams = `?assigned_to=${currentUser.id}`;
+        } else if (currentUser.role === 'sales_executive') {
+          queryParams = `?assigned_sales_id=${currentUser.id}`;
+        }
         const res = await fetch(`/api/leads${queryParams}`);
         if (res.ok) {
           const json = await res.json();
@@ -93,6 +128,10 @@ export class CrmService {
             saveToStorage(STORAGE_KEYS.LEADS, merged);
             if (currentUser.role === 'telecaller') {
               return merged.filter((l) => l.assigned_to === currentUser.id);
+            } else if (currentUser.role === 'sales_executive') {
+              return merged.filter(
+                (l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id
+              );
             }
             return merged;
           }
@@ -105,6 +144,10 @@ export class CrmService {
     const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
     if (currentUser.role === 'telecaller') {
       return allLeads.filter((l) => l.assigned_to === currentUser.id);
+    } else if (currentUser.role === 'sales_executive') {
+      return allLeads.filter(
+        (l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id
+      );
     }
     return allLeads;
   }
@@ -124,6 +167,8 @@ export class CrmService {
       non_conversion_notes: leadData.non_conversion_notes || '',
       notes: leadData.notes || '',
       assigned_to: leadData.assigned_to || (currentUser.role === 'telecaller' ? currentUser.id : 'c0000000-0000-0000-0000-000000000003'),
+      assigned_sales_id:
+        leadData.assigned_sales_id || (currentUser.role === 'sales_executive' ? currentUser.id : undefined),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -158,6 +203,10 @@ export class CrmService {
       }
     }
 
+    if (newLead.status === 'site_visit_scheduled' && !newLead.assigned_sales_id) {
+      newLead.assigned_sales_id = this.getNextSalesExecutive().id;
+    }
+
     const current = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
     const updated = [newLead, ...current];
     saveToStorage(STORAGE_KEYS.LEADS, updated);
@@ -169,7 +218,7 @@ export class CrmService {
     updates: Partial<Lead>,
     _currentUser: UserProfile
   ): Promise<Lead> {
-    const patch = {
+    const patch: Partial<Lead> = {
       ...updates,
       updated_at: new Date().toISOString(),
     };
@@ -188,20 +237,42 @@ export class CrmService {
       }
     }
 
-    // Sync with REST API
+    // Sync with REST API first so server performs authoritative round-robin assignment
     if (typeof window !== 'undefined') {
       try {
-        await fetch('/api/leads', {
+        const res = await fetch('/api/leads', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: leadId, ...patch }),
         });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            const savedLead: Lead = json.data;
+            const current = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+            const exists = current.some((item) => item.id === leadId);
+            const nextList = exists
+              ? current.map((item) => (item.id === leadId ? savedLead : item))
+              : [savedLead, ...current];
+            saveToStorage(STORAGE_KEYS.LEADS, nextList);
+            return savedLead;
+          }
+        }
       } catch (err) {
-        console.warn('REST API updateLead failed:', err);
+        console.warn('REST API updateLead failed, using local fallback:', err);
       }
     }
 
     const current = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+    const existingLead = current.find((l) => l.id === leadId);
+    if (
+      updates.status === 'site_visit_scheduled' &&
+      !patch.assigned_sales_id &&
+      !existingLead?.assigned_sales_id
+    ) {
+      patch.assigned_sales_id = this.getNextSalesExecutive().id;
+    }
+
     let updatedLead: Lead | null = null;
     const nextList = current.map((item) => {
       if (item.id === leadId) {
@@ -218,28 +289,9 @@ export class CrmService {
     throw new Error('Lead not found');
   }
 
-  static async deleteLead(leadId: string, _currentUser: UserProfile): Promise<boolean> {
-    if (isSupabaseConfigured()) {
-      try {
-        const { error } = await supabase.from('leads').delete().eq('id', leadId);
-        if (!error) return true;
-      } catch (err) {
-        console.warn('Supabase deleteLead failed:', err);
-      }
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        await fetch(`/api/leads?id=${encodeURIComponent(leadId)}`, { method: 'DELETE' });
-      } catch (err) {
-        console.warn('REST API deleteLead failed:', err);
-      }
-    }
-
-    const current = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
-    const filtered = current.filter((l) => l.id !== leadId);
-    saveToStorage(STORAGE_KEYS.LEADS, filtered);
-    return true;
+  static async deleteLead(_leadId: string, _currentUser: UserProfile): Promise<boolean> {
+    console.warn('Lead deletion is permanently disabled across Red Hill Infra CRM.');
+    return false;
   }
 
   static async bulkImportLeads(
@@ -338,7 +390,25 @@ export class CrmService {
           const json = await res.json();
           if (json.success && Array.isArray(json.data) && json.data.length > 0) {
             saveToStorage(STORAGE_KEYS.CALLS, json.data);
-            return json.data;
+            const list = json.data;
+            if (leadId) {
+              return list.filter((c: CallLog) => c.lead_id === leadId);
+            }
+            if (currentUser && currentUser.role === 'telecaller') {
+              const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+              const myLeadIds = new Set(allLeads.filter((l) => l.assigned_to === currentUser.id).map((l) => l.id));
+              return list.filter((c: CallLog) => c.caller_id === currentUser.id || myLeadIds.has(c.lead_id));
+            }
+            if (currentUser && currentUser.role === 'sales_executive') {
+              const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+              const myLeadIds = new Set(
+                allLeads
+                  .filter((l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id)
+                  .map((l) => l.id)
+              );
+              return list.filter((c: CallLog) => c.caller_id === currentUser.id || myLeadIds.has(c.lead_id));
+            }
+            return list;
           }
         }
       } catch (err) {
@@ -354,6 +424,14 @@ export class CrmService {
     } else if (currentUser && currentUser.role === 'telecaller') {
       const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
       const myLeadIds = new Set(allLeads.filter((l) => l.assigned_to === currentUser.id).map((l) => l.id));
+      filtered = filtered.filter((c) => c.caller_id === currentUser.id || myLeadIds.has(c.lead_id));
+    } else if (currentUser && currentUser.role === 'sales_executive') {
+      const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+      const myLeadIds = new Set(
+        allLeads
+          .filter((l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id)
+          .map((l) => l.id)
+      );
       filtered = filtered.filter((c) => c.caller_id === currentUser.id || myLeadIds.has(c.lead_id));
     }
 
@@ -415,6 +493,9 @@ export class CrmService {
     if (isSupabaseConfigured()) {
       try {
         let query = supabase.from('site_visits').select('*').order('scheduled_date', { ascending: true });
+        if (currentUser.role === 'sales_executive') {
+          query = query.eq('escort_id', currentUser.id);
+        }
         const { data, error } = await query;
         if (!error && data) return data as SiteVisit[];
       } catch (err) {
@@ -424,12 +505,32 @@ export class CrmService {
 
     if (typeof window !== 'undefined') {
       try {
-        const res = await fetch('/api/site-visits');
+        const queryParams = currentUser.role === 'sales_executive' ? `?escort_id=${currentUser.id}` : '';
+        const res = await fetch(`/api/site-visits${queryParams}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            saveToStorage(STORAGE_KEYS.SITE_VISITS, json.data);
-            return json.data;
+          if (json.success && Array.isArray(json.data)) {
+            const currentLocal = getFromStorage<SiteVisit[]>(STORAGE_KEYS.SITE_VISITS, INITIAL_SITE_VISITS);
+            const apiIds = new Set(json.data.map((v: SiteVisit) => v.id));
+            const localOnly = currentLocal.filter((v) => !apiIds.has(v.id));
+            const merged = [...json.data, ...localOnly];
+            saveToStorage(STORAGE_KEYS.SITE_VISITS, merged);
+
+            if (currentUser.role === 'telecaller') {
+              const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+              const myLeadIds = new Set(allLeads.filter((l) => l.assigned_to === currentUser.id).map((l) => l.id));
+              return merged.filter((v: SiteVisit) => v.escort_id === currentUser.id || myLeadIds.has(v.lead_id));
+            }
+            if (currentUser.role === 'sales_executive') {
+              const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+              const myLeadIds = new Set(
+                allLeads
+                  .filter((l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id)
+                  .map((l) => l.id)
+              );
+              return merged.filter((v: SiteVisit) => v.escort_id === currentUser.id || myLeadIds.has(v.lead_id));
+            }
+            return merged;
           }
         }
       } catch (err) {
@@ -443,6 +544,15 @@ export class CrmService {
       const myLeadIds = new Set(allLeads.filter((l) => l.assigned_to === currentUser.id).map((l) => l.id));
       return allVisits.filter((v) => v.escort_id === currentUser.id || myLeadIds.has(v.lead_id));
     }
+    if (currentUser.role === 'sales_executive') {
+      const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+      const myLeadIds = new Set(
+        allLeads
+          .filter((l) => l.assigned_sales_id === currentUser.id || l.assigned_to === currentUser.id)
+          .map((l) => l.id)
+      );
+      return allVisits.filter((v) => v.escort_id === currentUser.id || myLeadIds.has(v.lead_id));
+    }
     return allVisits;
   }
 
@@ -450,20 +560,26 @@ export class CrmService {
     visitData: Partial<SiteVisit>,
     _currentUser: UserProfile
   ): Promise<SiteVisit> {
-    const newVisit: SiteVisit = {
+    const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+    const targetLead = allLeads.find((l) => l.id === visitData.lead_id);
+    const salesExecs = this.getSortedSalesExecutives();
+    const isExplicitSalesExec =
+      visitData.escort_id && salesExecs.some((s) => s.id === visitData.escort_id);
+
+    const requestPayload: Partial<SiteVisit> = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `sv_${Date.now()}`,
       lead_id: visitData.lead_id || '',
-      lead_name: visitData.lead_name || 'Client',
-      lead_phone: visitData.lead_phone || '',
-      project_name: visitData.project_name || 'Red Hill Heights (HSR)',
+      lead_name: targetLead ? targetLead.name : visitData.lead_name || 'Client',
+      lead_phone: targetLead ? targetLead.phone : visitData.lead_phone || '',
+      project_name: visitData.project_name || targetLead?.project_interested || 'Red Hill Heights (HSR)',
       scheduled_date: visitData.scheduled_date || new Date(Date.now() + 86400000).toISOString(),
       status: visitData.status || 'scheduled',
       vehicle_type: visitData.vehicle_type || 'Innova Crysta (AC)',
       vehicle_number: visitData.vehicle_number || 'KA-01-MJ-4589',
       driver_name: visitData.driver_name || 'Ramesh Gowda',
       driver_phone: visitData.driver_phone || '+91 98450 12345',
-      escort_id: visitData.escort_id,
-      escort_name: visitData.escort_name || 'Relationship Manager',
+      escort_id: isExplicitSalesExec ? visitData.escort_id : targetLead?.assigned_sales_id,
+      escort_name: isExplicitSalesExec ? visitData.escort_name : undefined,
       pickup_location: visitData.pickup_location || 'HSR Layout Sector 1, BDA Complex',
       party_size: visitData.party_size || 2,
       visit_notes: visitData.visit_notes || '',
@@ -474,7 +590,7 @@ export class CrmService {
 
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase.from('site_visits').insert([newVisit]).select().single();
+        const { data, error } = await supabase.from('site_visits').insert([requestPayload]).select().single();
         if (!error && data) return data as SiteVisit;
       } catch (err) {
         console.warn('Supabase scheduleSiteVisit fallback:', err);
@@ -486,14 +602,30 @@ export class CrmService {
         const res = await fetch('/api/site-visits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newVisit),
+          body: JSON.stringify(requestPayload),
         });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
+            const savedVisit: SiteVisit = json.data;
             const current = getFromStorage<SiteVisit[]>(STORAGE_KEYS.SITE_VISITS, INITIAL_SITE_VISITS);
-            saveToStorage(STORAGE_KEYS.SITE_VISITS, [json.data, ...current.filter((v) => v.id !== json.data.id)]);
-            return json.data;
+            saveToStorage(STORAGE_KEYS.SITE_VISITS, [savedVisit, ...current.filter((v) => v.id !== savedVisit.id)]);
+
+            if (savedVisit.lead_id && savedVisit.escort_id) {
+              const leadsNow = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+              const updatedLeads = leadsNow.map((l) =>
+                l.id === savedVisit.lead_id
+                  ? {
+                      ...l,
+                      status: 'site_visit_scheduled' as LeadStatus,
+                      assigned_sales_id: savedVisit.escort_id,
+                      updated_at: new Date().toISOString(),
+                    }
+                  : l
+              );
+              saveToStorage(STORAGE_KEYS.LEADS, updatedLeads);
+            }
+            return savedVisit;
           }
         }
       } catch (err) {
@@ -501,9 +633,42 @@ export class CrmService {
       }
     }
 
+    // Offline fallback only
+    let assignedSalesId = targetLead?.assigned_sales_id || (isExplicitSalesExec ? visitData.escort_id : undefined);
+    let escortName = isExplicitSalesExec ? visitData.escort_name : undefined;
+    if (!assignedSalesId) {
+      const nextSales = this.getNextSalesExecutive();
+      assignedSalesId = nextSales.id;
+      escortName = nextSales.full_name;
+    } else if (!escortName) {
+      escortName = salesExecs.find((s) => s.id === assignedSalesId)?.full_name || 'Relationship Manager';
+    }
+
+    const offlineVisit: SiteVisit = {
+      ...(requestPayload as SiteVisit),
+      escort_id: assignedSalesId,
+      escort_name: escortName,
+    };
+
     const current = getFromStorage<SiteVisit[]>(STORAGE_KEYS.SITE_VISITS, INITIAL_SITE_VISITS);
-    saveToStorage(STORAGE_KEYS.SITE_VISITS, [newVisit, ...current]);
-    return newVisit;
+    saveToStorage(STORAGE_KEYS.SITE_VISITS, [offlineVisit, ...current]);
+
+    if (offlineVisit.lead_id) {
+      const leadsNow = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+      const updatedLeads = leadsNow.map((l) =>
+        l.id === offlineVisit.lead_id
+          ? {
+              ...l,
+              status: 'site_visit_scheduled' as LeadStatus,
+              assigned_sales_id: assignedSalesId,
+              updated_at: new Date().toISOString(),
+            }
+          : l
+      );
+      saveToStorage(STORAGE_KEYS.LEADS, updatedLeads);
+    }
+
+    return offlineVisit;
   }
 
   static async updateSiteVisit(visitId: string, updates: Partial<SiteVisit>): Promise<SiteVisit> {
@@ -623,7 +788,7 @@ export class CrmService {
   // --------------------------------------------------------------------------
   static async getTelecallerLeaderboard(): Promise<TelecallerStats[]> {
     const profiles = await this.getProfiles();
-    const telecallers = profiles.filter((p) => p.role === 'telecaller' || p.role === 'manager');
+    const telecallers = profiles.filter((p) => p.role === 'telecaller' || p.role === 'manager' || p.role === 'sales_executive');
 
     const allLeads = getFromStorage<Lead[]>(STORAGE_KEYS.LEADS, INITIAL_LEADS);
     const allCalls = getFromStorage<CallLog[]>(STORAGE_KEYS.CALLS, INITIAL_CALLS);

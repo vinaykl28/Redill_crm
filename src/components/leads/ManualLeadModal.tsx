@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lead, LeadStatus, NonConversionReason, UserProfile } from '@/types/crm';
 import { CrmService } from '@/lib/crmService';
-import { X, UserPlus, AlertCircle, Building2 } from 'lucide-react';
+import { X, UserPlus, AlertCircle, Building2, Calendar } from 'lucide-react';
 
 interface ManualLeadModalProps {
   isOpen: boolean;
@@ -88,7 +88,26 @@ export function ManualLeadModal({
     assigned_to: currentUser.role === 'telecaller' ? currentUser.id : telecallers[0]?.id || '',
   });
 
+  const [visitDateTime, setVisitDateTime] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('HSR Layout Sector 1, BDA Complex');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const telecallerList = telecallers.filter((t) => t.role === 'telecaller');
+  const needsVisitSchedule =
+    formData.status === 'site_visit_scheduled' &&
+    (!initialLead || initialLead.status !== 'site_visit_scheduled');
+
+  useEffect(() => {
+    if (formData.status === 'site_visit_scheduled' && !visitDateTime) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(11, 0, 0, 0);
+      const localIso = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setVisitDateTime(localIso);
+    }
+  }, [formData.status, visitDateTime]);
 
   useEffect(() => {
     if (initialLead) {
@@ -119,8 +138,9 @@ export function ManualLeadModal({
         non_conversion_reason: '',
         non_conversion_notes: '',
         notes: '',
-        assigned_to: currentUser.role === 'telecaller' ? currentUser.id : telecallers[0]?.id || '',
+        assigned_to: currentUser.role === 'telecaller' ? currentUser.id : telecallerList[0]?.id || telecallers[0]?.id || '',
       });
+      setVisitDateTime('');
     }
   }, [initialLead, isOpen, currentUser, telecallers]);
 
@@ -138,10 +158,16 @@ export function ManualLeadModal({
       return;
     }
 
+    if (needsVisitSchedule && !visitDateTime) {
+      alert('Please select a Site Visit Date & Time to block the assigned Sales Executive calendar.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      let savedLead: Lead;
       if (initialLead) {
-        await CrmService.updateLead(
+        savedLead = await CrmService.updateLead(
           initialLead.id,
           {
             ...formData,
@@ -150,7 +176,7 @@ export function ManualLeadModal({
           currentUser
         );
       } else {
-        await CrmService.createLead(
+        savedLead = await CrmService.createLead(
           {
             ...formData,
             non_conversion_reason: formData.status === 'not_interested' ? (formData.non_conversion_reason as NonConversionReason) : null,
@@ -158,6 +184,27 @@ export function ManualLeadModal({
           currentUser
         );
       }
+
+      // If transitioning to or created as Site Visit Scheduled, block the Sales Executive's calendar!
+      if (formData.status === 'site_visit_scheduled' && visitDateTime && needsVisitSchedule) {
+        await CrmService.scheduleSiteVisit(
+          {
+            lead_id: savedLead.id,
+            lead_name: savedLead.name,
+            lead_phone: savedLead.phone,
+            project_name: savedLead.project_interested,
+            scheduled_date: new Date(visitDateTime).toISOString(),
+            status: 'scheduled',
+            pickup_location: pickupLocation || 'Customer Residence / Office',
+            visit_notes: formData.notes || 'Scheduled during lead intake.',
+            escort_id:
+              savedLead.assigned_sales_id ||
+              (currentUser.role === 'sales_executive' ? currentUser.id : undefined),
+          },
+          currentUser
+        );
+      }
+
       setIsSubmitting(false);
       onSaved();
       onClose();
@@ -311,7 +358,7 @@ export function ManualLeadModal({
                 onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:border-amber-500 focus:outline-none disabled:opacity-60"
               >
-                {telecallers.map((t) => (
+                {(currentUser.role === 'telecaller' ? telecallerList : telecallers).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.full_name} ({t.role})
                   </option>
@@ -319,6 +366,50 @@ export function ManualLeadModal({
               </select>
             </div>
           </div>
+
+          {/* Conditional Site Visit Date & Time (Blocks Assigned Sales Executive Calendar) */}
+          {needsVisitSchedule && (
+            <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#B36B39] space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-[#934F23] font-bold text-xs">
+                  <Calendar className="w-4 h-4" />
+                  <span>Site Visit Date & Time (Required to Block Calendar)</span>
+                </div>
+                <span className="text-[10px] bg-[#F7EBE1] text-[#934F23] font-semibold px-2 py-0.5 rounded-full border border-[#E8D4C2]">
+                  Confidential Auto-Dispatch
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+                    Date & Time <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={visitDateTime}
+                    onChange={(e) => setVisitDateTime(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg p-2 text-slate-800 text-xs focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+                    Pickup Location / Landmark
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Koramangala or HSR Sector 2"
+                    value={pickupLocation}
+                    onChange={(e) => setPickupLocation(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-800 text-xs focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-[#78716C]">
+                Lead will automatically route in alphabetical order to the next available Sales Executive and block this date & time on their Calendar.
+              </p>
+            </div>
+          )}
 
           {/* Conditional Non-Conversion Section */}
           {formData.status === 'not_interested' && (

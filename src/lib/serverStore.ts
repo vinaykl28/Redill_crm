@@ -14,6 +14,7 @@ interface ServerState {
   siteVisits: SiteVisit[];
   documents: CrmDocument[];
   profiles: UserProfile[];
+  salesRoundRobinIndex: number;
   configuredSupabaseUrl?: string;
   configuredSupabaseAnonKey?: string;
 }
@@ -30,16 +31,40 @@ if (!global.__redhillServerState || global.__redhillServerState.siteVisits.lengt
     siteVisits: JSON.parse(JSON.stringify(INITIAL_SITE_VISITS)),
     documents: global.__redhillServerState?.documents || JSON.parse(JSON.stringify(INITIAL_DOCUMENTS)),
     profiles: global.__redhillServerState?.profiles || JSON.parse(JSON.stringify(INITIAL_PROFILES)),
+    salesRoundRobinIndex: 0,
   };
 }
 
 export const serverState = global.__redhillServerState;
 
 export class ServerStore {
+  // --- ROUND-ROBIN SALES EXECUTIVE AUTO-ASSIGNMENT (ALPHABETICAL) ---
+  static getSortedSalesExecutives(): UserProfile[] {
+    return serverState.profiles
+      .filter((p) => p.role === 'sales_executive')
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }
+
+  static getNextSalesExecutive(): UserProfile {
+    const salesExecs = this.getSortedSalesExecutives();
+    if (salesExecs.length === 0) return serverState.profiles[0];
+    const currentIdx = serverState.salesRoundRobinIndex || 0;
+    const assigned = salesExecs[currentIdx % salesExecs.length];
+    serverState.salesRoundRobinIndex = (currentIdx + 1) % salesExecs.length;
+    return assigned;
+  }
+
+  static peekNextSalesExecutive(): UserProfile {
+    const salesExecs = this.getSortedSalesExecutives();
+    if (salesExecs.length === 0) return serverState.profiles[0];
+    const currentIdx = serverState.salesRoundRobinIndex || 0;
+    return salesExecs[currentIdx % salesExecs.length];
+  }
   // --- LEADS ---
   static async getLeads(filters?: {
     status?: string;
     assigned_to?: string;
+    assigned_sales_id?: string;
     source?: string;
     search?: string;
   }): Promise<Lead[]> {
@@ -48,6 +73,9 @@ export class ServerStore {
         let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
         if (filters?.status) query = query.eq('status', filters.status);
         if (filters?.assigned_to) query = query.eq('assigned_to', filters.assigned_to);
+        if (filters?.assigned_sales_id) {
+          query = query.or(`assigned_sales_id.eq.${filters.assigned_sales_id},assigned_to.eq.${filters.assigned_sales_id}`);
+        }
         if (filters?.source) query = query.eq('source', filters.source);
         const { data, error } = await query;
         if (!error && data) return data as Lead[];
@@ -62,6 +90,13 @@ export class ServerStore {
     }
     if (filters?.assigned_to) {
       list = list.filter((l) => l.assigned_to === filters.assigned_to);
+    }
+    if (filters?.assigned_sales_id) {
+      list = list.filter(
+        (l) =>
+          l.assigned_sales_id === filters.assigned_sales_id ||
+          l.assigned_to === filters.assigned_sales_id
+      );
     }
     if (filters?.source) {
       list = list.filter((l) => l.source.toLowerCase() === filters.source?.toLowerCase());
@@ -80,11 +115,18 @@ export class ServerStore {
   }
 
   static async createLead(leadData: Partial<Lead>): Promise<Lead> {
+    const status = (leadData.status as LeadStatus) || 'new';
+    let assignedSalesId = leadData.assigned_sales_id;
+    if (status === 'site_visit_scheduled' && !assignedSalesId) {
+      assignedSalesId = this.getNextSalesExecutive().id;
+    }
+
     const newLead: Lead = {
       id:
-        typeof crypto !== 'undefined' && crypto.randomUUID
+        leadData.id ||
+        (typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
-          : `lead_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          : `lead_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
       name: leadData.name || 'Untitled Lead',
       phone: leadData.phone || '',
       email: leadData.email || '',
@@ -92,12 +134,13 @@ export class ServerStore {
       campaign_name: leadData.campaign_name || 'HSR_PreLaunch_Digital',
       project_interested: leadData.project_interested || 'Red Hill Heights (HSR)',
       budget: leadData.budget || '1.5 Cr - 2.5 Cr',
-      status: (leadData.status as LeadStatus) || 'new',
+      status,
       non_conversion_reason: leadData.non_conversion_reason || null,
       non_conversion_notes: leadData.non_conversion_notes || '',
       notes: leadData.notes || '',
       assigned_to: leadData.assigned_to || 'c0000000-0000-0000-0000-000000000003',
-      created_at: new Date().toISOString(),
+      assigned_sales_id: assignedSalesId,
+      created_at: leadData.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
@@ -154,10 +197,21 @@ export class ServerStore {
   }
 
   static async updateLead(id: string, updates: Partial<Lead>): Promise<Lead | null> {
-    const patch = {
+    const currentLead = serverState.leads.find((l) => l.id === id);
+    const patch: Partial<Lead> = {
       ...updates,
       updated_at: new Date().toISOString(),
     };
+
+    // Auto-assign in alphabetical order to the 4 sales executives when accepted for site visit
+    if (
+      updates.status === 'site_visit_scheduled' &&
+      !updates.assigned_sales_id &&
+      !currentLead?.assigned_sales_id
+    ) {
+      const nextSales = this.getNextSalesExecutive();
+      patch.assigned_sales_id = nextSales.id;
+    }
 
     if (isSupabaseConfigured()) {
       try {
@@ -263,12 +317,13 @@ export class ServerStore {
   }
 
   // --- SITE VISITS ---
-  static async getSiteVisits(status?: string, leadId?: string): Promise<SiteVisit[]> {
+  static async getSiteVisits(status?: string, leadId?: string, escortId?: string): Promise<SiteVisit[]> {
     if (isSupabaseConfigured()) {
       try {
         let query = supabase.from('site_visits').select('*').order('scheduled_date', { ascending: true });
         if (status) query = query.eq('status', status);
         if (leadId) query = query.eq('lead_id', leadId);
+        if (escortId) query = query.eq('escort_id', escortId);
         const { data, error } = await query;
         if (!error && data) return data as SiteVisit[];
       } catch (e) {
@@ -279,11 +334,36 @@ export class ServerStore {
     let list = [...serverState.siteVisits];
     if (status) list = list.filter((v) => v.status === status);
     if (leadId) list = list.filter((v) => v.lead_id === leadId);
+    if (escortId) list = list.filter((v) => v.escort_id === escortId);
     return list;
   }
 
   static async createSiteVisit(visitData: Partial<SiteVisit>): Promise<SiteVisit> {
     const lead = serverState.leads.find((l) => l.id === visitData.lead_id);
+    const explicitSalesExec = visitData.escort_id
+      ? serverState.profiles.find((p) => p.id === visitData.escort_id && p.role === 'sales_executive')
+      : undefined;
+
+    let assignedSalesId = lead?.assigned_sales_id;
+    let escortId = explicitSalesExec?.id;
+    let escortName = explicitSalesExec?.full_name;
+
+    // When site visit is scheduled/accepted, auto-assign to next sales executive in alphabetical order
+    if (!assignedSalesId) {
+      if (explicitSalesExec) {
+        assignedSalesId = explicitSalesExec.id;
+      } else {
+        const nextSales = this.getNextSalesExecutive();
+        assignedSalesId = nextSales.id;
+        escortId = nextSales.id;
+        escortName = nextSales.full_name;
+      }
+    } else if (!escortId) {
+      const assignedExec = serverState.profiles.find((p) => p.id === assignedSalesId);
+      escortId = assignedSalesId;
+      escortName = assignedExec?.full_name || visitData.escort_name;
+    }
+
     const newVisit: SiteVisit = {
       id:
         typeof crypto !== 'undefined' && crypto.randomUUID
@@ -299,8 +379,8 @@ export class ServerStore {
       vehicle_number: visitData.vehicle_number || 'KA-01-MJ-8821',
       driver_name: visitData.driver_name || 'Ramesh Gowda',
       driver_phone: visitData.driver_phone || '+91 98440 22331',
-      escort_id: visitData.escort_id || 'c0000000-0000-0000-0000-000000000003',
-      escort_name: visitData.escort_name || 'Amit Kumar',
+      escort_id: escortId || 'b0000000-0000-0000-0000-000000000004',
+      escort_name: escortName || 'Ananya Deshmukh',
       pickup_location: visitData.pickup_location || 'Customer Residence / Office',
       party_size: Number(visitData.party_size || 2),
       visit_notes: visitData.visit_notes || '',
@@ -321,7 +401,10 @@ export class ServerStore {
     serverState.siteVisits.unshift(newVisit);
 
     if (visitData.lead_id) {
-      await this.updateLead(visitData.lead_id, { status: 'site_visit_scheduled' });
+      await this.updateLead(visitData.lead_id, {
+        status: 'site_visit_scheduled',
+        assigned_sales_id: assignedSalesId,
+      });
     }
 
     return newVisit;

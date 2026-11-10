@@ -45,8 +45,12 @@ export function LogCallModal({
   const [durationSec, setDurationSec] = useState(180);
   const [notes, setNotes] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
+  const [pickupLocation, setPickupLocation] = useState('HSR Layout Sector 1, BDA Complex');
   const [updateLeadStatus, setUpdateLeadStatus] = useState<LeadStatus | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isSiteVisitAccepted =
+    outcome === 'site_visit_requested' || updateLeadStatus === 'site_visit_scheduled';
 
   useEffect(() => {
     if (selectedLead) {
@@ -55,6 +59,18 @@ export function LogCallModal({
       setLeadId(leads[0].id);
     }
   }, [selectedLead, leads, leadId]);
+
+  useEffect(() => {
+    if (isSiteVisitAccepted && !followUpDate) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(11, 0, 0, 0);
+      const localIso = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setFollowUpDate(localIso);
+    }
+  }, [isSiteVisitAccepted, followUpDate]);
 
   if (!isOpen) return null;
 
@@ -68,6 +84,10 @@ export function LogCallModal({
     }
     if (!notes.trim()) {
       alert('Please provide brief call notes');
+      return;
+    }
+    if (isSiteVisitAccepted && !followUpDate) {
+      alert('Please enter the Site Visit Date & Time so it blocks the assigned Sales Executive calendar.');
       return;
     }
 
@@ -87,11 +107,26 @@ export function LogCallModal({
         currentUser
       );
 
-      // If user chose to update lead status from call outcome
-      if (updateLeadStatus) {
+      // When lead is accepted for site visit, schedule with chosen Date & Time so ServerStore auto-assigns confidentially
+      if (isSiteVisitAccepted) {
+        await CrmService.scheduleSiteVisit(
+          {
+            lead_id: leadId,
+            lead_name: currentLead?.name || 'Client',
+            lead_phone: currentLead?.phone || '',
+            project_name: currentLead?.project_interested || 'Red Hill Heights (HSR)',
+            scheduled_date: new Date(followUpDate).toISOString(),
+            status: 'scheduled',
+            pickup_location: pickupLocation || 'Customer Residence / Office',
+            visit_notes: notes || 'Site visit accepted during telecalling qualification.',
+            escort_id:
+              currentUser.role === 'sales_executive' ? currentUser.id : currentLead?.assigned_sales_id,
+            escort_name: currentUser.role === 'sales_executive' ? currentUser.full_name : undefined,
+          },
+          currentUser
+        );
+      } else if (updateLeadStatus) {
         await CrmService.updateLead(leadId, { status: updateLeadStatus }, currentUser);
-      } else if (outcome === 'site_visit_requested') {
-        await CrmService.updateLead(leadId, { status: 'site_visit_scheduled' }, currentUser);
       } else if (outcome === 'interested' && currentLead?.status === 'new') {
         await CrmService.updateLead(leadId, { status: 'interested' }, currentUser);
       } else if (currentLead?.status === 'new') {
@@ -215,37 +250,81 @@ export function LogCallModal({
             ></textarea>
           </div>
 
-          {/* Follow-up Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Next Follow-up Reminder (Optional)
-              </label>
-              <input
-                type="datetime-local"
-                value={followUpDate}
-                onChange={(e) => setFollowUpDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:border-amber-500 focus:outline-none"
-              />
+          {/* Follow-up Date / Site Visit Date & Time */}
+          <div
+            className={`p-3 rounded-xl border space-y-3 ${
+              isSiteVisitAccepted
+                ? 'bg-[#FAF8F5] border-[#B36B39]'
+                : 'bg-slate-50/40 border-slate-200'
+            }`}
+          >
+            {isSiteVisitAccepted && (
+              <div className="flex items-center justify-between gap-2 pb-1 border-b border-[#EDE6DC]">
+                <span className="text-[11px] font-bold text-[#934F23]">
+                  Site Visit Booking & Calendar Block
+                </span>
+                <span className="text-[10px] bg-[#F7EBE1] text-[#934F23] font-semibold px-2 py-0.5 rounded-full border border-[#E8D4C2]">
+                  Confidential Round-Robin
+                </span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  {isSiteVisitAccepted ? (
+                    <>
+                      Site Visit Date & Time <span className="text-rose-500">*</span>
+                    </>
+                  ) : (
+                    'Next Follow-up Reminder (Optional)'
+                  )}
+                </label>
+                <input
+                  type="datetime-local"
+                  required={isSiteVisitAccepted}
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-800 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Update Lead Status (Optional)
+                </label>
+                <select
+                  value={updateLeadStatus}
+                  onChange={(e) => setUpdateLeadStatus(e.target.value as any)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-800 focus:border-amber-500 focus:outline-none capitalize"
+                >
+                  <option value="">-- Keep Current Status --</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="interested">Interested</option>
+                  <option value="site_visit_scheduled">Site Visit Scheduled</option>
+                  <option value="converted">Converted</option>
+                  <option value="not_interested">Not Interested</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Update Lead Status (Optional)
-              </label>
-              <select
-                value={updateLeadStatus}
-                onChange={(e) => setUpdateLeadStatus(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-800 focus:border-amber-500 focus:outline-none capitalize"
-              >
-                <option value="">-- Keep Current Status --</option>
-                <option value="contacted">Contacted</option>
-                <option value="interested">Interested</option>
-                <option value="site_visit_scheduled">Site Visit Scheduled</option>
-                <option value="converted">Converted</option>
-                <option value="not_interested">Not Interested</option>
-              </select>
-            </div>
+            {isSiteVisitAccepted && (
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Client Pickup Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Koramangala 4th Block or HSR Sector 2"
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg p-2 text-slate-800 focus:border-amber-500 focus:outline-none"
+                />
+                <p className="text-[10px] text-[#78716C] mt-1.5">
+                  Automatically routes to the next Sales Executive in alphabetical order and blocks their calendar at this exact date & time.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200">

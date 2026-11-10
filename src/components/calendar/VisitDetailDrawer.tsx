@@ -3,6 +3,7 @@
 import React from 'react';
 import { SiteVisit, SiteVisitStatus } from '@/types/crm';
 import { CrmService } from '@/lib/crmService';
+import { useAuth } from '@/context/AuthContext';
 import {
   X,
   Calendar,
@@ -26,6 +27,7 @@ interface VisitDetailDrawerProps {
 }
 
 export function VisitDetailDrawer({ visit, onClose, onUpdated }: VisitDetailDrawerProps) {
+  const { role } = useAuth();
   if (!visit) return null;
 
   const dateObj = new Date(visit.scheduled_date);
@@ -167,7 +169,7 @@ export function VisitDetailDrawer({ visit, onClose, onUpdated }: VisitDetailDraw
               <div>
                 <span className="text-slate-400 text-[11px]">Sales Escort Assigned:</span>
                 <p className="font-semibold text-slate-800">
-                  {visit.escort_name || 'Dedicated RM'}
+                  {role === 'telecaller' ? 'Assigned Sales Desk (Confidential)' : visit.escort_name || 'Dedicated RM'}
                 </p>
               </div>
             </div>

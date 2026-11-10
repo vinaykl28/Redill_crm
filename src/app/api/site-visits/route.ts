@@ -7,8 +7,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || undefined;
     const lead_id = searchParams.get('lead_id') || undefined;
+    const escort_id = searchParams.get('escort_id') || undefined;
 
-    const visits = await ServerStore.getSiteVisits(status, lead_id);
+    const visits = await ServerStore.getSiteVisits(status, lead_id, escort_id);
 
     return NextResponse.json({
       success: true,

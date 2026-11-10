@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import { AuthGate } from '@/components/auth/AuthGate';
 
 export const metadata: Metadata = {
   title: 'Red Hill Infra • Premier Real Estate Developer CRM',
@@ -29,7 +30,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full bg-[#f8fafc] text-slate-800 font-sans selection:bg-amber-500 selection:text-white" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AuthGate>{children}</AuthGate>
+        </AuthProvider>
       </body>
     </html>
   );

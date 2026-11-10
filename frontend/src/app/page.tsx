@@ -12,22 +12,14 @@ import { NonConversionChart } from '@/components/dashboard/NonConversionChart';
 import { SourcePerformanceChart } from '@/components/dashboard/SourcePerformanceChart';
 import { ConversionTrendChart } from '@/components/dashboard/ConversionTrendChart';
 import { LeadsTable } from '@/components/leads/LeadsTable';
+import { SalesExecutiveDashboard } from '@/components/dashboard/SalesExecutiveDashboard';
+import { TelecallerDashboard } from '@/components/dashboard/TelecallerDashboard';
 import { BulkImportModal } from '@/components/leads/BulkImportModal';
 import { ManualLeadModal } from '@/components/leads/ManualLeadModal';
 import { LogCallModal } from '@/components/calls/LogCallModal';
 import { ScheduleVisitModal } from '@/components/site-visits/ScheduleVisitModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
-import {
-  Sparkles,
-  ShieldCheck,
-  Building2,
-  CalendarDays,
-  FileSpreadsheet,
-  PlusCircle,
-  PhoneCall,
-  Flame,
-  Layers,
-} from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 export default function DashboardPage() {
   const { currentUser, role, availableProfiles, isLoading } = useAuth();
@@ -88,12 +80,7 @@ export default function DashboardPage() {
     setIsManualLeadOpen(true);
   };
 
-  const handleDeleteLead = async (leadId: string) => {
-    await CrmService.deleteLead(leadId, currentUser);
-    loadAllData();
-  };
-
-  if (isLoading) {
+  if (isLoading || !currentUser) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center text-slate-600 text-sm">
         <div className="flex items-center gap-3">
@@ -107,7 +94,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] text-slate-800">
+    <div className="flex min-h-screen bg-[#FAF8F5] text-[#1E242B] font-['Plus_Jakarta_Sans']">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -124,48 +111,92 @@ export default function DashboardPage() {
         />
 
         <main className="flex-1 p-8 space-y-7 overflow-y-auto">
-          {/* Metric KPI Cards */}
-          <MetricCards leads={leads} visits={visits} calls={calls} />
+          {/* 1. SUPER ADMIN VIEW - Preserved exactly as existing with no changes */}
+          {role === 'admin' && (
+            <>
+              {/* Metric KPI Cards */}
+              <MetricCards leads={leads} visits={visits} calls={calls} />
 
-          {/* Charts Row 1: Conversion Funnel & Non-Conversion Reasons */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ConversionFunnelChart leads={leads} />
-            <NonConversionChart leads={leads} />
-          </div>
-
-          {/* Charts Row 2: Ad Channels & Conversion Trajectory */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SourcePerformanceChart leads={leads} />
-            <ConversionTrendChart leads={leads} />
-          </div>
-
-          {/* Leads Table Section */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2 font-['Outfit']">
-                  <Flame className="w-5 h-5 text-amber-600" />
-                  Live Leads Pipeline
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {role === 'telecaller'
-                    ? 'Your assigned leads portfolio'
-                    : 'All company leads across Meta Ads, Google Ads, and Portals'}
-                </p>
+              {/* Charts Row 1: Conversion Funnel & Non-Conversion Reasons */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ConversionFunnelChart leads={leads} />
+                <NonConversionChart leads={leads} />
               </div>
-            </div>
 
-            <LeadsTable
+              {/* Charts Row 2: Ad Channels & Conversion Trajectory */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <SourcePerformanceChart leads={leads} />
+                <ConversionTrendChart leads={leads} />
+              </div>
+
+              {/* Leads Table Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2 font-['Outfit']">
+                      <Flame className="w-5 h-5 text-amber-600" />
+                      Live Leads Pipeline
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      All company leads across Meta Ads, Google Ads, and Portals
+                    </p>
+                  </div>
+                </div>
+
+                <LeadsTable
+                  leads={leads}
+                  currentUser={currentUser}
+                  telecallers={availableProfiles}
+                  onViewLead={handleViewLeadDetail}
+                  onEditLead={handleEditLead}
+                  onOpenLogCall={handleOpenLogCallForLead}
+                  onOpenScheduleVisit={handleOpenScheduleVisitForLead}
+                />
+              </div>
+            </>
+          )}
+
+          {/* 2. SALES EXECUTIVE VIEW */}
+          {(role === 'sales_executive' || role === 'manager') && (
+            <SalesExecutiveDashboard
               leads={leads}
+              visits={visits}
+              calls={calls}
               currentUser={currentUser}
-              telecallers={availableProfiles}
-              onViewLead={handleViewLeadDetail}
-              onEditLead={handleEditLead}
-              onDeleteLead={handleDeleteLead}
-              onOpenLogCall={handleOpenLogCallForLead}
-              onOpenScheduleVisit={handleOpenScheduleVisitForLead}
+              onOpenScheduleVisit={(lead) => {
+                if (lead) setActiveLead(lead);
+                setIsScheduleVisitOpen(true);
+              }}
+              onOpenLogCall={(lead) => {
+                if (lead) setActiveLead(lead);
+                setIsLogCallOpen(true);
+              }}
+              onOpenNewLead={() => {
+                setActiveLead(null);
+                setIsManualLeadOpen(true);
+              }}
+              onViewLeadDetail={handleViewLeadDetail}
             />
-          </div>
+          )}
+
+          {/* 3. TELECALLER VIEW */}
+          {role === 'telecaller' && (
+            <TelecallerDashboard
+              leads={leads}
+              visits={visits}
+              calls={calls}
+              currentUser={currentUser}
+              onOpenLogCall={(lead) => {
+                if (lead) setActiveLead(lead);
+                setIsLogCallOpen(true);
+              }}
+              onOpenScheduleVisit={(lead) => {
+                if (lead) setActiveLead(lead);
+                setIsScheduleVisitOpen(true);
+              }}
+              onViewLeadDetail={handleViewLeadDetail}
+            />
+          )}
         </main>
       </div>
 

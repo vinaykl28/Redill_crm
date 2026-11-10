@@ -3,11 +3,12 @@ import { ServerStore } from '../data/serverStore';
 
 export async function getLeads(req: Request, res: Response) {
   try {
-    const { status, assigned_to, source, search } = req.query;
+    const { status, assigned_to, assigned_sales_id, source, search } = req.query;
 
     const leads = await ServerStore.getLeads({
       status: status as string,
       assigned_to: assigned_to as string,
+      assigned_sales_id: assigned_sales_id as string,
       source: source as string,
       search: search as string,
     });
@@ -79,25 +80,9 @@ export async function updateLead(req: Request, res: Response) {
   }
 }
 
-export async function deleteLead(req: Request, res: Response) {
-  try {
-    const id = (req.params.id || req.query.id) as string;
-
-    if (!id) {
-      return res.status(400).json({ success: false, error: 'Lead ID is required.' });
-    }
-
-    const deleted = await ServerStore.deleteLead(id);
-    if (!deleted) {
-      return res.status(404).json({ success: false, error: 'Lead not found or already deleted.' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Lead deleted successfully',
-      id,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Failed to delete lead' });
-  }
+export async function deleteLead(_req: Request, res: Response) {
+  return res.status(403).json({
+    success: false,
+    error: 'Lead deletion is disabled to preserve enterprise audit logs and data integrity.',
+  });
 }

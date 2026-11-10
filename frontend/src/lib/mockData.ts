@@ -1,50 +1,64 @@
 import { UserProfile, Lead, CallLog, SiteVisit, CrmDocument } from '@/types/crm';
 
 export const INITIAL_PROFILES: UserProfile[] = [
+  // 1 Super Admin
   {
     id: 'a0000000-0000-0000-0000-000000000001',
     full_name: 'Rajesh Reddy',
-    email: 'rajesh.reddy@redhillinfra.in',
+    email: 'admin@redhillinfra.in',
     role: 'admin',
     phone: '+91 99001 11222',
-    department: 'Executive Leadership (Chairman)',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    department: 'Executive Leadership',
   },
+  // 4 Sales Executives
   {
     id: 'b0000000-0000-0000-0000-000000000002',
     full_name: 'Priya Sharma',
-    email: 'priya.sharma@redhillinfra.in',
-    role: 'manager',
-    phone: '+91 98450 33444',
-    department: 'Sales & Pre-sales Operations',
-    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    email: 'sales1@redhillinfra.in',
+    role: 'sales_executive',
+    phone: '+91 98450 33441',
+    department: 'Sales Team',
   },
+  {
+    id: 'b0000000-0000-0000-0000-000000000003',
+    full_name: 'Rahul Verma',
+    email: 'sales2@redhillinfra.in',
+    role: 'sales_executive',
+    phone: '+91 98450 33442',
+    department: 'Sales Team',
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000004',
+    full_name: 'Ananya Deshmukh',
+    email: 'sales3@redhillinfra.in',
+    role: 'sales_executive',
+    phone: '+91 98450 33443',
+    department: 'Sales Team',
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000005',
+    full_name: 'Vikram Malhotra',
+    email: 'sales4@redhillinfra.in',
+    role: 'sales_executive',
+    phone: '+91 98450 33444',
+    department: 'Sales Team',
+  },
+  // 2 Tele Callers
   {
     id: 'c0000000-0000-0000-0000-000000000003',
     full_name: 'Amit Kumar',
-    email: 'amit.kumar@redhillinfra.in',
+    email: 'telecaller1@redhillinfra.in',
     role: 'telecaller',
-    phone: '+91 97410 55666',
-    department: 'HSR Layout Sales Desk',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    phone: '+91 97410 55661',
+    department: 'Telecalling Desk',
   },
   {
     id: 'd0000000-0000-0000-0000-000000000004',
     full_name: 'Sneha Patel',
-    email: 'sneha.patel@redhillinfra.in',
+    email: 'telecaller2@redhillinfra.in',
     role: 'telecaller',
-    phone: '+91 96200 77888',
-    department: 'Sarjapur Villa Plots Desk',
-    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'e0000000-0000-0000-0000-000000000005',
-    full_name: 'Karthik Nair',
-    email: 'karthik.nair@redhillinfra.in',
-    role: 'telecaller',
-    phone: '+91 95350 99000',
-    department: 'Commercial & Penthouse Desk',
-    avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+    phone: '+91 96200 77882',
+    department: 'Telecalling Desk',
   },
 ];
 
@@ -60,7 +74,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1.5 Cr - 2.5 Cr',
     status: 'converted',
     notes: 'VP of Eng at Bellandur tech firm. Booked 3BHK Unit 402 with 10% token amount.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000002', // Priya Sharma (Sales 1)
     created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 10 * 86400000).toISOString(),
   },
@@ -75,7 +90,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1 Cr - 1.5 Cr',
     status: 'converted',
     notes: 'East-facing villa plot booked. Paid booking advance after site visit.',
-    assigned_to: 'd0000000-0000-0000-0000-000000000004',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000003', // Rahul Verma (Sales 2)
     created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 7 * 86400000).toISOString(),
   },
@@ -90,7 +106,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '2.5 Cr+',
     status: 'converted',
     notes: 'Penthouse booked on 14th floor with private terrace deck.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000004', // Ananya Deshmukh (Sales 3)
     created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 86400000).toISOString(),
   },
@@ -105,7 +122,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1 Cr - 1.5 Cr',
     status: 'site_visit_scheduled',
     notes: 'Confirmed site visit for Saturday morning with family. Innova car arranged.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000002', // Priya Sharma (Sales 1)
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
   },
@@ -120,7 +138,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '75L - 1 Cr',
     status: 'site_visit_scheduled',
     notes: 'Interested in 2400 sqft plot. Requested escort by relationship manager.',
-    assigned_to: 'e0000000-0000-0000-0000-000000000005',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000003', // Rahul Verma (Sales 2)
     created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -135,7 +154,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1.5 Cr - 2.5 Cr',
     status: 'site_visit_scheduled',
     notes: 'Visiting Sunday 3 PM. Needs cab pickup from HSR Sector 2.',
-    assigned_to: 'd0000000-0000-0000-0000-000000000004',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000004', // Ananya Deshmukh (Sales 3)
     created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -150,7 +170,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1 Cr - 1.5 Cr',
     status: 'interested',
     notes: 'Liked brochure and 2.5 BHK floor plan. Requested callback on Friday 4 PM.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000005', // Vikram Malhotra (Sales 4)
     created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -165,7 +186,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '2.5 Cr+',
     status: 'interested',
     notes: 'Evaluating 1500 sqft retail space on ORR. Requested ROI calculation sheet.',
-    assigned_to: 'e0000000-0000-0000-0000-000000000005',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000002', // Priya Sharma (Sales 1)
     created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
@@ -180,7 +202,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1 Cr - 1.5 Cr',
     status: 'contacted',
     notes: 'Called once. Asked to call back after 7 PM as he was in sprint meetings.',
-    assigned_to: 'd0000000-0000-0000-0000-000000000004',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000003', // Rahul Verma (Sales 2)
     created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 12 * 3600000).toISOString(),
   },
@@ -195,7 +218,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1.5 Cr - 2.5 Cr',
     status: 'contacted',
     notes: 'Spoke for 4 mins. Sent WhatsApp brochure. Follow-up scheduled for tomorrow.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000004', // Ananya Deshmukh (Sales 3)
     created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 8 * 3600000).toISOString(),
   },
@@ -210,7 +234,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1 Cr - 1.5 Cr',
     status: 'new',
     notes: 'Fresh ad click lead from Instagram form. Uncalled.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000005', // Vikram Malhotra (Sales 4)
     created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 3600000).toISOString(),
   },
@@ -225,7 +250,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '75L - 1 Cr',
     status: 'new',
     notes: 'Google search lead inquiry for gated community plots.',
-    assigned_to: 'd0000000-0000-0000-0000-000000000004',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000002', // Priya Sharma (Sales 1)
     created_at: new Date(Date.now() - 2 * 3600000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 3600000).toISOString(),
   },
@@ -240,7 +266,8 @@ export const INITIAL_LEADS: Lead[] = [
     budget: '1.5 Cr - 2.5 Cr',
     status: 'new',
     notes: 'Submitted web inquiry form directly on website.',
-    assigned_to: 'e0000000-0000-0000-0000-000000000005',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000003', // Rahul Verma (Sales 2)
     created_at: new Date(Date.now() - 1 * 3600000).toISOString(),
     updated_at: new Date(Date.now() - 1 * 3600000).toISOString(),
   },
@@ -257,7 +284,8 @@ export const INITIAL_LEADS: Lead[] = [
     non_conversion_reason: 'Budget mismatch',
     non_conversion_notes: 'Client maximum budget is 60 Lakhs all-inclusive. Our starting ticket is 1.45 Cr.',
     notes: 'Budget cannot be stretched.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000004', // Ananya Deshmukh (Sales 3)
     created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 6 * 86400000).toISOString(),
   },
@@ -274,7 +302,8 @@ export const INITIAL_LEADS: Lead[] = [
     non_conversion_reason: 'Location mismatch (wants outside HSR)',
     non_conversion_notes: 'Client strictly wants Whitefield / ITPL corridor due to kid schooling.',
     notes: 'Location mismatch.',
-    assigned_to: 'd0000000-0000-0000-0000-000000000004',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000005', // Vikram Malhotra (Sales 4)
     created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
   },
@@ -291,7 +320,8 @@ export const INITIAL_LEADS: Lead[] = [
     non_conversion_reason: 'Bought competitor property',
     non_conversion_notes: 'Already finalized an apartment at Sobha Dream Acres last week.',
     notes: 'Closed with competitor.',
-    assigned_to: 'e0000000-0000-0000-0000-000000000005',
+    assigned_to: 'd0000000-0000-0000-0000-000000000004', // Sneha Patel (Telecaller 2)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000002', // Priya Sharma (Sales 1)
     created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 86400000).toISOString(),
   },
@@ -308,7 +338,8 @@ export const INITIAL_LEADS: Lead[] = [
     non_conversion_reason: 'Delayed plan (6+ months)',
     non_conversion_notes: 'Current rental lease in HSR Sector 3 ends mid-2027. Might revisit next year.',
     notes: 'Postponed purchase plan.',
-    assigned_to: 'c0000000-0000-0000-0000-000000000003',
+    assigned_to: 'c0000000-0000-0000-0000-000000000003', // Amit Kumar (Telecaller 1)
+    assigned_sales_id: 'b0000000-0000-0000-0000-000000000005', // Vikram Malhotra (Sales 4)
     created_at: new Date(Date.now() - 9 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 7 * 86400000).toISOString(),
   },
@@ -398,8 +429,8 @@ export const INITIAL_CALLS: CallLog[] = [
     id: '22222222-2222-2222-2222-222222222208',
     lead_id: '11111111-1111-1111-1111-111111111108',
     lead_name: 'Arjun Bansal',
-    caller_id: 'e0000000-0000-0000-0000-000000000005',
-    caller_name: 'Karthik Nair',
+    caller_id: 'd0000000-0000-0000-0000-000000000004',
+    caller_name: 'Sneha Patel',
     call_outcome: 'interested',
     notes: 'Discussed expected footfall and rental yield of 8.2% on Outer Ring Road commercial units.',
     duration_seconds: 350,
@@ -421,33 +452,13 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
     driver_name: 'Ramesh Gowda',
     driver_phone: '+91 98450 12345',
     escort_id: 'b0000000-0000-0000-0000-000000000002',
-    escort_name: 'Priya Sharma (Manager)',
+    escort_name: 'Priya Sharma',
     pickup_location: 'Koramangala 4th Block, near Wipro Park',
     party_size: 3,
     visit_notes: 'Client attended with spouse and architect friend. Loved natural light in Unit 402.',
     feedback: 'Superb site experience. Converted on spot with token!',
     created_at: new Date(Date.now() - 11 * 86400000).toISOString(),
     updated_at: new Date(Date.now() - 10 * 86400000).toISOString(),
-  },
-  {
-    id: '33333333-3333-3333-3333-333333333301',
-    lead_id: '11111111-1111-1111-1111-111111111101',
-    lead_name: 'Siddharth Varma',
-    lead_phone: '+91 98450 77112',
-    project_name: 'Red Hill Heights (HSR)',
-    scheduled_date: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
-    status: 'scheduled',
-    vehicle_type: 'Innova Crysta (AC)',
-    vehicle_number: 'KA-01-MJ-4589',
-    driver_name: 'Ramesh Gowda',
-    driver_phone: '+91 98450 12345',
-    escort_id: 'c0000000-0000-0000-0000-000000000003',
-    escort_name: 'Amit Kumar',
-    pickup_location: 'HSR Layout Sector 1, BDA Complex',
-    party_size: 2,
-    visit_notes: 'Showcase 3BHK model flat on 4th floor. Client interested in east-facing corner unit.',
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    updated_at: new Date(Date.now() - 86400000).toISOString(),
   },
   {
     id: '33333333-3333-3333-3333-333333333302',
@@ -461,8 +472,8 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
     vehicle_number: 'KA-01-MJ-4589',
     driver_name: 'Ramesh Gowda',
     driver_phone: '+91 98450 12345',
-    escort_id: 'c0000000-0000-0000-0000-000000000003',
-    escort_name: 'Amit Kumar',
+    escort_id: 'b0000000-0000-0000-0000-000000000002',
+    escort_name: 'Priya Sharma',
     pickup_location: 'Koramangala 4th Block Club',
     party_size: 3,
     visit_notes: 'En route to site. Showcase penthouse and rooftop clubhouse.',
@@ -471,6 +482,27 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
   },
   {
     id: '33333333-3333-3333-3333-333333333303',
+    lead_id: '11111111-1111-1111-1111-111111111102',
+    lead_name: 'Ananya Deshmukh',
+    lead_phone: '+91 97422 34091',
+    project_name: 'Red Hill Meadows (Sarjapur-HSR)',
+    scheduled_date: new Date(Date.now() - 7 * 86400000).toISOString(),
+    status: 'completed',
+    vehicle_type: 'Honda City (Executive)',
+    vehicle_number: 'KA-05-AB-7744',
+    driver_name: 'Manjunath Swamy',
+    driver_phone: '+91 97410 88990',
+    escort_id: 'b0000000-0000-0000-0000-000000000003',
+    escort_name: 'Rahul Verma',
+    pickup_location: 'Bellandur EcoSpace Main Gate',
+    party_size: 2,
+    visit_notes: 'Inspected East-facing villa plot. Finalized agreement on spot.',
+    feedback: 'Client extremely satisfied with documentation clarity.',
+    created_at: new Date(Date.now() - 8 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+  },
+  {
+    id: '33333333-3333-3333-3333-333333333304',
     lead_id: '11111111-1111-1111-1111-111111111105',
     lead_name: 'Meera Krishnan',
     lead_phone: '+91 96112 89045',
@@ -481,8 +513,8 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
     vehicle_number: 'KA-05-AB-7744',
     driver_name: 'Manjunath Swamy',
     driver_phone: '+91 97410 88990',
-    escort_id: 'e0000000-0000-0000-0000-000000000005',
-    escort_name: 'Karthik Nair',
+    escort_id: 'b0000000-0000-0000-0000-000000000003',
+    escort_name: 'Rahul Verma',
     pickup_location: 'Bellandur EcoSpace Main Gate',
     party_size: 2,
     visit_notes: 'Showcase Phase 1 villa plots 12 to 18 facing central park and clubhouse.',
@@ -490,10 +522,30 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
     updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
   {
-    id: '33333333-3333-3333-3333-333333333304',
-    lead_id: '11111111-1111-1111-1111-111111111102',
-    lead_name: 'Vikramaditya Hegde',
-    lead_phone: '+91 98860 12045',
+    id: '33333333-3333-3333-3333-333333333305',
+    lead_id: '11111111-1111-1111-1111-111111111106',
+    lead_name: 'Rohan Sengupta',
+    lead_phone: '+91 95380 44102',
+    project_name: 'Red Hill Heights (HSR)',
+    scheduled_date: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
+    status: 'scheduled',
+    vehicle_type: 'Innova Crysta (AC)',
+    vehicle_number: 'KA-01-MJ-4589',
+    driver_name: 'Ramesh Gowda',
+    driver_phone: '+91 98450 12345',
+    escort_id: 'b0000000-0000-0000-0000-000000000004',
+    escort_name: 'Ananya Deshmukh',
+    pickup_location: 'HSR Layout Sector 1, BDA Complex',
+    party_size: 2,
+    visit_notes: 'Showcase 3BHK model flat on 4th floor. Client interested in east-facing corner unit.',
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: '33333333-3333-3333-3333-333333333306',
+    lead_id: '11111111-1111-1111-1111-111111111107',
+    lead_name: 'Kavita Menon',
+    lead_phone: '+91 99002 67890',
     project_name: 'Red Hill Serenity',
     scheduled_date: new Date(new Date(Date.now() + 2 * 86400000).setHours(10, 0, 0, 0)).toISOString(),
     status: 'scheduled',
@@ -501,8 +553,8 @@ export const INITIAL_SITE_VISITS: SiteVisit[] = [
     vehicle_number: 'KA-51-EX-1290',
     driver_name: 'Suresh Kumar',
     driver_phone: '+91 96200 44332',
-    escort_id: 'c0000000-0000-0000-0000-000000000003',
-    escort_name: 'Amit Kumar',
+    escort_id: 'b0000000-0000-0000-0000-000000000005',
+    escort_name: 'Vikram Malhotra',
     pickup_location: 'HSR Sector 2, 27th Main',
     party_size: 4,
     visit_notes: 'Family visit with parents. Inspect 4BHK garden villa.',

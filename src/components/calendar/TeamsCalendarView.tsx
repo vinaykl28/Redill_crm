@@ -430,7 +430,9 @@ export function TeamsCalendarView({
                                       {visit.vehicle_type?.split(' ')[0] || 'Innova'}
                                     </span>
                                     <span className="truncate text-slate-500">
-                                      {visit.escort_name?.split(' ')[0] || 'Escort'}
+                                      {currentUser.role === 'telecaller'
+                                        ? 'Sales Desk'
+                                        : visit.escort_name?.split(' ')[0] || 'Escort'}
                                     </span>
                                   </div>
                                 </div>
@@ -526,7 +528,12 @@ export function TeamsCalendarView({
                                 <Car className="w-3.5 h-3.5 text-blue-600" />
                                 {visit.vehicle_type} ({visit.driver_name})
                               </span>
-                              <span>Escort: {visit.escort_name}</span>
+                              <span>
+                                Escort:{' '}
+                                {currentUser.role === 'telecaller'
+                                  ? 'Assigned Sales Desk (Confidential)'
+                                  : visit.escort_name}
+                              </span>
                             </div>
                           </div>
                         ))}

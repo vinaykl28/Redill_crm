@@ -162,7 +162,12 @@ export function SiteVisitsList({ visits, currentUser, onVisitUpdated }: SiteVisi
                     <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                       <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span className="text-slate-600">
-                        Sales Escort: <strong className="text-slate-900">{visit.escort_name || 'Relationship Manager'}</strong>
+                        Sales Escort:{' '}
+                        <strong className="text-slate-900">
+                          {currentUser.role === 'telecaller'
+                            ? 'Assigned Sales Desk (Confidential)'
+                            : visit.escort_name || 'Relationship Manager'}
+                        </strong>
                       </span>
                     </div>
                   </div>

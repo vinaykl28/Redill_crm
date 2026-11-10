@@ -48,26 +48,61 @@ export function ScheduleVisitModal({
   const [vehicleNumber, setVehicleNumber] = useState(VEHICLES[0].number);
   const [driverName, setDriverName] = useState(VEHICLES[0].driver);
   const [driverPhone, setDriverPhone] = useState(VEHICLES[0].phone);
-  const [escortId, setEscortId] = useState(currentUser.id);
+  const [escortId, setEscortId] = useState('');
   const [pickupLocation, setPickupLocation] = useState('HSR Layout Sector 1, BDA Complex');
   const [partySize, setPartySize] = useState(2);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const salesExecutives = CrmService.getSortedSalesExecutives();
+
   useEffect(() => {
     if (selectedLead) {
       setLeadId(selectedLead.id);
       setProjectName(selectedLead.project_interested || 'Red Hill Heights (HSR)');
+      if (selectedLead.assigned_sales_id) {
+        setEscortId(selectedLead.assigned_sales_id);
+      } else if (currentUser.role === 'sales_executive') {
+        setEscortId(currentUser.id);
+      } else if (currentUser.role !== 'telecaller') {
+        const nextExec = CrmService.peekNextSalesExecutive();
+        setEscortId(nextExec.id);
+      }
     } else if (leads.length > 0 && !leadId) {
       setLeadId(leads[0].id);
       setProjectName(leads[0].project_interested || 'Red Hill Heights (HSR)');
+      if (leads[0].assigned_sales_id) {
+        setEscortId(leads[0].assigned_sales_id);
+      } else if (currentUser.role === 'sales_executive') {
+        setEscortId(currentUser.id);
+      } else if (currentUser.role !== 'telecaller') {
+        const nextExec = CrmService.peekNextSalesExecutive();
+        setEscortId(nextExec.id);
+      }
     }
-    // Default scheduled time to tomorrow 11:00 AM
+    // Default scheduled time to tomorrow 11:00 AM local time
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(11, 0, 0, 0);
-    setScheduledDate(tomorrow.toISOString().slice(0, 16));
-  }, [selectedLead, leads, leadId]);
+    const localIso = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+    setScheduledDate(localIso);
+  }, [selectedLead, leads, leadId, currentUser]);
+
+  useEffect(() => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (lead) {
+      if (lead.assigned_sales_id) {
+        setEscortId(lead.assigned_sales_id);
+      } else if (currentUser.role === 'sales_executive') {
+        setEscortId(currentUser.id);
+      } else if (currentUser.role !== 'telecaller') {
+        const nextExec = CrmService.peekNextSalesExecutive();
+        setEscortId(nextExec.id);
+      }
+    }
+  }, [leadId, leads, currentUser]);
 
   if (!isOpen) return null;
 
@@ -95,7 +130,17 @@ export function ScheduleVisitModal({
 
     setIsSubmitting(true);
     try {
-      const escortObj = telecallers.find((t) => t.id === escortId);
+      let chosenEscortId: string | undefined = currentLead?.assigned_sales_id;
+      let chosenEscortName: string | undefined;
+
+      if (currentUser.role === 'sales_executive') {
+        chosenEscortId = currentUser.id;
+        chosenEscortName = currentUser.full_name;
+      } else if (currentUser.role !== 'telecaller' && escortId) {
+        chosenEscortId = escortId;
+        chosenEscortName = salesExecutives.find((s) => s.id === escortId)?.full_name;
+      }
+
       await CrmService.scheduleSiteVisit(
         {
           lead_id: leadId,
@@ -108,17 +153,14 @@ export function ScheduleVisitModal({
           vehicle_number: vehicleNumber,
           driver_name: driverName,
           driver_phone: driverPhone,
-          escort_id: escortId,
-          escort_name: escortObj?.full_name || currentUser.full_name,
+          escort_id: chosenEscortId,
+          escort_name: chosenEscortName,
           pickup_location: pickupLocation,
           party_size: partySize,
           visit_notes: notes,
         },
         currentUser
       );
-
-      // Automatically update lead status to Site Visit Scheduled
-      await CrmService.updateLead(leadId, { status: 'site_visit_scheduled' }, currentUser);
 
       setIsSubmitting(false);
       onScheduled();
@@ -278,20 +320,45 @@ export function ScheduleVisitModal({
 
           {/* Escort Assignment */}
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Sales Escort / Relationship Manager <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={escortId}
-              onChange={(e) => setEscortId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800 focus:border-amber-500 focus:outline-none"
-            >
-              {telecallers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name} ({t.role} • {t.department})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-semibold text-slate-700 block text-xs">
+                Sales Executive Assignment {currentUser.role !== 'telecaller' && <span className="text-rose-500">*</span>}
+              </label>
+              <span className="text-[10px] bg-[#F7EBE1] text-[#934F23] font-bold px-2 py-0.5 rounded-full border border-[#E8D4C2]">
+                Round-Robin Auto-Assign
+              </span>
+            </div>
+
+            {currentUser.role === 'telecaller' ? (
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EDE6DC] space-y-1">
+                <p className="text-xs font-bold text-[#1C1917]">
+                  Automatic Alphabetical Round-Robin Dispatch (Confidential)
+                </p>
+                <p className="text-[11px] text-[#78716C]">
+                  Booking this visit will automatically route the lead to the next Sales Executive in queue and block their calendar at the selected date & time. Executive names remain hidden from the telecalling desk.
+                </p>
+              </div>
+            ) : (
+              <>
+                <select
+                  value={escortId}
+                  disabled={currentUser.role === 'sales_executive'}
+                  onChange={(e) => setEscortId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:border-amber-500 focus:outline-none disabled:opacity-60"
+                >
+                  {salesExecutives.map((t, idx) => (
+                    <option key={t.id} value={t.id}>
+                      {idx + 1}. {t.full_name} ({t.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-[#78716C] mt-1 bg-[#FAF8F5] p-2 rounded-lg border border-[#EDE6DC]">
+                  {currentLead?.assigned_sales_id
+                    ? `Lead is assigned to ${salesExecutives.find((s) => s.id === currentLead.assigned_sales_id)?.full_name}. Other sales executives cannot view this lead.`
+                    : `Lead will be auto-assigned in alphabetical order to the 4 sales executives one by one.`}
+                </p>
+              </>
+            )}
           </div>
 
           {/* Notes */}

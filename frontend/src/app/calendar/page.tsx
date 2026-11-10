@@ -64,7 +64,7 @@ export default function CalendarPage() {
   const uniqueVehicles = new Set(visits.map((v) => v.vehicle_type).filter(Boolean)).size;
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] text-slate-800">
+    <div className="flex min-h-screen bg-[#FAF8F5] text-[#1E242B] font-['Plus_Jakarta_Sans']">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0">

@@ -12,7 +12,7 @@ import { ManualLeadModal } from '@/components/leads/ManualLeadModal';
 import { LogCallModal } from '@/components/calls/LogCallModal';
 import { ScheduleVisitModal } from '@/components/site-visits/ScheduleVisitModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
-import { Users, FileSpreadsheet, PlusCircle, Sparkles } from 'lucide-react';
+import { Users, FileSpreadsheet, PlusCircle, Sparkles, ChevronRight } from 'lucide-react';
 
 export default function LeadsPage() {
   const { currentUser, role, availableProfiles, isLoading } = useAuth();
@@ -54,20 +54,15 @@ export default function LeadsPage() {
     setIsManualLeadOpen(true);
   };
 
-  const handleDeleteLead = async (leadId: string) => {
-    await CrmService.deleteLead(leadId, currentUser);
-    loadLeads();
-  };
-
-  if (isLoading) return null;
+  if (isLoading || !currentUser) return null;
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] text-slate-800">
+    <div className="flex min-h-screen bg-[#FAF8F5] text-[#1E242B] font-['Plus_Jakarta_Sans']">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Header
           title="Lead Intake & Pipeline Management"
-          subtitle="Manage digital ad leads, Excel bulk imports, lifecycle progression, and non-conversion reasons"
+          subtitle="Manage digital ad leads, track bulk imports, and keep your pipeline organized."
           onOpenNewLead={() => {
             setActiveLead(null);
             setIsManualLeadOpen(true);
@@ -79,23 +74,32 @@ export default function LeadsPage() {
           }}
         />
 
-        <main className="flex-1 p-6 space-y-6 overflow-y-auto">
-          {/* Quick Header Banner */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl luxury-card border border-slate-200 shadow-xs">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 font-['Outfit']">
-                <Users className="w-5 h-5 text-amber-600" />
-                {role === 'telecaller' ? 'My Assigned Leads' : 'All Developer Leads Portfolio'}
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Total {leads.length} leads in current portfolio
-              </p>
+        <main className="flex-1 p-6 sm:p-8 space-y-5 overflow-y-auto">
+          {/* Action Cards Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            {/* Left Card: All Developer Leads Portfolio */}
+            <div className="md:col-span-7 bg-white rounded-2xl border border-[#EDE7DD] p-4 sm:p-5 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-[#FAF0E6] border border-[#F3E2D0] flex items-center justify-center text-[#B36B39] shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#1C1917] font-['Outfit']">
+                    {role === 'telecaller' ? 'My Assigned Leads' : 'All Developer Leads Portfolio'}
+                  </h2>
+                  <p className="text-xs text-[#78716C] mt-0.5">
+                    Total {leads.length} leads in current portfolio
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#9CA3AF]" />
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Right Card: Bulk Import & Add Lead Manually */}
+            <div className="md:col-span-5 bg-white rounded-2xl border border-[#EDE7DD] p-3 sm:p-3.5 flex items-center justify-end gap-2.5 shadow-xs">
               <button
                 onClick={() => setIsBulkImportOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-emerald-700 transition shadow-xs"
+                className="flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#FAF8F5] border border-[#E2DBD0] text-xs font-semibold text-[#374151] transition shadow-xs cursor-pointer"
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                 <span>Bulk Import (CSV / Excel)</span>
@@ -105,7 +109,7 @@ export default function LeadsPage() {
                   setActiveLead(null);
                   setIsManualLeadOpen(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl gold-gradient-bg text-white font-bold text-xs shadow-md transition"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#B36B39] hover:bg-[#9E5A2C] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4 stroke-[2.5]" />
                 <span>Add Lead Manually</span>
@@ -120,7 +124,6 @@ export default function LeadsPage() {
             telecallers={availableProfiles}
             onViewLead={handleViewLeadDetail}
             onEditLead={handleEditLead}
-            onDeleteLead={handleDeleteLead}
             onOpenLogCall={handleOpenLogCallForLead}
             onOpenScheduleVisit={handleOpenScheduleVisitForLead}
           />

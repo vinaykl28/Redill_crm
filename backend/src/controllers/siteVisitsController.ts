@@ -3,9 +3,13 @@ import { ServerStore } from '../data/serverStore';
 
 export async function getSiteVisits(req: Request, res: Response) {
   try {
-    const { status, lead_id } = req.query;
+    const { status, lead_id, escort_id } = req.query;
 
-    const visits = await ServerStore.getSiteVisits(status as string, lead_id as string);
+    const visits = await ServerStore.getSiteVisits(
+      status as string,
+      lead_id as string,
+      escort_id as string
+    );
 
     res.json({
       success: true,

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'telecaller';
+export type UserRole = 'admin' | 'manager' | 'sales_executive' | 'telecaller';
 
 export interface UserProfile {
   id: string;
@@ -41,7 +41,8 @@ export interface Lead {
   non_conversion_reason?: NonConversionReason | null;
   non_conversion_notes?: string;
   notes?: string;
-  assigned_to?: string;
+  assigned_to?: string; // Telecaller / primary UserProfile id
+  assigned_sales_id?: string; // Sales Executive UserProfile id
   assigned_user?: UserProfile;
   created_at: string;
   updated_at: string;
